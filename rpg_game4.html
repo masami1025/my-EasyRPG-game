@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web RPG Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- CSS スタイル設定 --- */
+        :root {
+            --bg-color: #202020;
+            --box-bg: #000000;
+            --border-color: #ffffff;
+            --text-color: #ffffff;
+            --accent-color: #ffd700;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            font-family: 'DotGothic16', sans-serif;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none; /* テキスト選択禁止 */
+        }
+
+        #game-container {
+            width: 800px;
+            height: 600px;
+            background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
+            position: relative;
+            border: 4px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        #scene-display {
+            width: 100%;
+            height: 70%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 100px;
+        }
+
+        #message-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 140px;
+            background-color: rgba(0, 0, 0, 0.85);
+            border: 3px solid var(--border-color);
+            border-radius: 4px;
+            padding: 20px;
+            box-sizing: border-box;
+            font-size: 24px;
+            line-height: 1.6;
+            cursor: pointer;
+        }
+
+        .cursor-blink {
+            display: inline-block;
+            animation: blink 1s step-end infinite;
+            color: var(--accent-color);
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        #choices-container {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .choice-btn {
+            background-color: rgba(0, 0, 0, 0.9);
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: 'DotGothic16', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            min-width: 300px;
+        }
+
+        .choice-btn:hover {
+            background-color: var(--border-color);
+            color: var(--box-bg);
+            transform: scale(1.05);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="scene-display">🏰</div>
+        <div id="choices-container" class="hidden"></div>
+        <div id="message-box" onclick="handleMessageClick()">
+            <span id="text-content"></span>
+            <span id="next-cursor" class="hidden">▼</span>
+        </div>
+    </div>
+
+    <script>
+        // --- シナリオデータ ---
+        const scenario = {
+            "start": {
+                text: "あなたは　古城の前に　立っている。\n重厚な扉が　閉ざされているようだ。",
+                choices: [
+                    { text: "扉をノックする", next: "scene_knock" },
+                    { text: "周囲を調べる", next: "scene_search" }
+                ]
+            },
+            "scene_knock": {
+                text: "コンコン……。\n\n中から　誰かの気配がする。",
+                choices: [
+                    { text: "「誰かいますか？」と叫ぶ", next: "scene_shout" },
+                    { text: "逃げ出す", next: "scene_run" }
+                ]
+            },
+            "scene_search": {
+                text: "足元に　鍵が落ちていた！\nこれで扉が　開くかもしれない。",
+                choices: [
+                    { text: "鍵を使って開ける", next: "scene_open" },
+                    { text: "見なかったことにして帰る", next: "scene_run" }
+                ]
+            },
+            "scene_shout": {
+                text: "「うるさいぞ！」\n古城から怒った衛兵が　飛び出してきた！",
+                choices: [
+                    { text: "斬りかかる", next: "scene_slash" },
+                    { text: "謝ってこの場を去る", next: "scene_goodbye" }
+                ]
+            },
+            "scene_run": {
+                text: "あなたは　全力で　逃げ出した。\n君子危うきに近寄らず、だ。\n\n(GAME OVER - リロードして再挑戦)",
+                choices: []
+            },
+            "scene_open": {
+                text: "ガチャリ。\n扉が開いた。\nあなたの冒険は　ここから始まる……！\n\n(TO BE CONTINUED)",
+                choices: []
+            },
+            "scene_slash": {
+                text: "あなたは　衛兵に斬りかかった。\nしかし、負けた、あなたの旅は終わってしまった！\n\n(GAME OVER - リロードして再挑戦)",
+                choices: []
+            },
+            "scene_goodbye": {
+                text: "あなたは　全力で　謝った。\n60°に及ぶ土下座によって許された。\n\n(END - リロードして再挑戦)",
+                choices: []
+            }
+        };
+
+        // --- 変数定義 ---
+        let currentSceneId = "start";
+        let isTyping = false;
+        let typingInterval;
+        let fullText = "";
+        
+        const textElement = document.getElementById("text-content");
+        const cursorElement = document.getElementById("next-cursor");
+        const choicesContainer = document.getElementById("choices-container");
+        const sceneDisplay = document.getElementById("scene-display");
+
+        // --- ゲーム開始 ---
+        window.onload = () => {
+            loadScene("start");
+        };
+
+        // --- シナリオ読み込み関数 ---
+        function loadScene(sceneId) {
+            currentSceneId = sceneId;
+            const sceneData = scenario[sceneId];
+
+            textElement.innerHTML = "";
+            cursorElement.classList.add("hidden");
+            choicesContainer.classList.add("hidden");
+            choicesContainer.innerHTML = ""; 
+
+            fullText = sceneData.text;
+            startTypewriter(fullText, () => {
+                showChoices(sceneData.choices);
+            });
+        }
+
+        // --- タイプライター演出関数 ---
+        function startTypewriter(text, callback) {
+            isTyping = true;
+            let index = 0;
+            textElement.innerHTML = "";
+
+            typingInterval = setInterval(() => {
+                if (index < text.length) {
+                    const char = text.charAt(index);
+                    if (char === "\n") {
+                        textElement.innerHTML += "<br>";
+                    } else {
+                        textElement.innerHTML += char;
+                    }
+                    index++;
+                } else {
+                    finishTyping(callback);
+                }
+            }, 50);
+        }
+
+        // --- タイピング強制終了（スキップ） ---
+        function finishTyping(callback) {
+            clearInterval(typingInterval);
+            textElement.innerHTML = fullText.replace(/\n/g, "<br>");
+            isTyping = false;
+
+            if (scenario[currentSceneId].choices && scenario[currentSceneId].choices.length > 0) {
+                cursorElement.classList.remove("hidden");
+                cursorElement.classList.add("cursor-blink");
+            }
+
+            if (callback) callback();
+        }
+
+        // --- クリック時の挙動制御 ---
+        function handleMessageClick() {
+            if (isTyping) {
+                const sceneData = scenario[currentSceneId];
+                finishTyping(() => {
+                    showChoices(sceneData.choices);
+                });
+            }
+        }
+
+        // --- 選択肢の表示 ---
+        function showChoices(choices) {
+            if (!choices || choices.length === 0) return;
+            
+            setTimeout(() => {
+                choicesContainer.classList.remove("hidden");
+                choices.forEach(choice => {
+                    const button = document.createElement("button");
+                    button.innerText = choice.text;
+                    button.className = "choice-btn";
+                    button.onclick = (e) => {
+                        e.stopPropagation();
+                        loadScene(choice.next);
+                    };
+                    choicesContainer.appendChild(button);
+                });
+            }, 200);
+        }
+    </script>
+</body>
+</html>
